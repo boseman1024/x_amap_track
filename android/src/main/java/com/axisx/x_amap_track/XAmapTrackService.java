@@ -49,10 +49,10 @@ public class XAmapTrackService extends  Service{
             if (latestPointResponse.isSuccess()) {
                 Point point = latestPointResponse.getLatestPoint().getPoint();
                 Log.d(TAG, "实时位置："+point.getTime());
-                pointCallback.onPointChange(point);
+                if(pointCallback!=null){pointCallback.onPointChange(point);}
             } else {
                 Log.d(TAG, "查询实时位置失败");
-                pointCallback.onPointChange(null);
+                if(pointCallback!=null){pointCallback.onPointChange(null);}
             }
         }
         @Override

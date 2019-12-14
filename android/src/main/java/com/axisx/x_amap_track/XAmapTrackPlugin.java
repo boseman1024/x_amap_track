@@ -20,6 +20,7 @@ import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
+import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
 import io.flutter.embedding.engine.plugins.activity.*;
@@ -28,24 +29,61 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import static android.content.Context.NOTIFICATION_SERVICE;
+import android.os.Handler;
+import android.os.Message;
 import com.amap.api.track.query.entity.Point;
+import org.json.JSONObject;
+import java.util.HashMap;
+import java.util.Map;
 
 public class XAmapTrackPlugin implements FlutterPlugin, MethodCallHandler,ActivityAware,ServiceAware{
     private final String TAG = "XAmapTrackPlugin";
     private static PluginRegistry.Registrar registrar;
     private Context context;
     private static Activity activity;
-
+    private static EventChannel.EventSink eventSink;
     private XAmapTrackService xAmapTrackService;
 
     private static IntentFilter s_intentFilter;
     private ThreadPoolExecutor threadPool;
 
+    private String SERVICE_ID;
+    private String TERMINAL_ID;
+    private String TRACK_ID;
 
     static {
         s_intentFilter = new IntentFilter();
         s_intentFilter.addAction("ALARM");
     }
+
+    //实时点位监听
+    private Handler handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if(msg.obj!=null){
+                Point point = (Point)msg.obj;
+                Map<String,Object> map = new HashMap<String,Object>();
+                map.put("time" , point.getTime());
+                map.put("lat" , point.getLat());
+                map.put("lng" , point.getLng());
+                map.put("props" , point.getProps());
+                map.put("direction" , point.getDirection());
+                map.put("accuracy" , point.getAccuracy());
+                map.put("height" , point.getHeight());
+                JSONObject jsonObject = new JSONObject(map);
+                Log.d(TAG,"点位返回："+jsonObject.toString());
+                if(eventSink!=null){
+                    Log.d(TAG,"eventSink已初始化：");
+                    eventSink.success(jsonObject.toString());
+                }else{
+                    Log.d(TAG,"eventSink未初始化");
+                }
+
+            }
+            Log.d(TAG,"点位监听结束");
+        }
+    };
 
     //服务连接
     private ServiceConnection conn = new ServiceConnection(){
@@ -57,10 +95,19 @@ public class XAmapTrackPlugin implements FlutterPlugin, MethodCallHandler,Activi
             try{
                 xAmapTrackService = ((XAmapTrackService.MyBinder)service).getService();
                 Intent i = new Intent();
-                i.putExtra("SERVICE_ID", String.valueOf(93958));
-                i.putExtra("TERMINAL_ID", String.valueOf(231732097));
-                i.putExtra("TRACK_ID", String.valueOf(20));
+                i.putExtra("SERVICE_ID", SERVICE_ID);
+                i.putExtra("TERMINAL_ID", TERMINAL_ID);
+                i.putExtra("TRACK_ID", TRACK_ID);
                 xAmapTrackService.onStartCommand(i, 0, 0);
+                xAmapTrackService.setPointCallback(new XAmapTrackService.PointCallback(){
+                    @Override
+                    public void onPointChange(Point point){
+                        Log.d(TAG,"点位发生改变");
+                        Message msg = new Message();
+                        msg.obj = point;
+                        handler.sendMessage(msg);
+                    }
+                });
             }catch (Exception e){
                 Log.d(TAG,"服务异常："+e);
             }
@@ -88,6 +135,19 @@ public class XAmapTrackPlugin implements FlutterPlugin, MethodCallHandler,Activi
     public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
         final MethodChannel channel = new MethodChannel(flutterPluginBinding.getFlutterEngine().getDartExecutor(), "x_amap_track");
         channel.setMethodCallHandler(new XAmapTrackPlugin(flutterPluginBinding.getApplicationContext()));
+        final EventChannel eventChannel = new EventChannel(flutterPluginBinding.getBinaryMessenger(), "x_amap_track_event_channel");
+        eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
+            @Override
+            public void onListen(Object o, EventChannel.EventSink eventSink) {
+                XAmapTrackPlugin.this.eventSink = eventSink;
+                Log.d(TAG,(eventSink==null)+" ");
+            }
+
+            @Override
+            public void onCancel(Object o) {
+                XAmapTrackPlugin.this.eventSink = null;
+            }
+        });
     }
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {}
@@ -123,9 +183,15 @@ public class XAmapTrackPlugin implements FlutterPlugin, MethodCallHandler,Activi
         if (call.method.equals("getPlatformVersion")) {
             result.success("Android " + android.os.Build.VERSION.RELEASE);
         } if (call.method.equals("bind")) {
+            SERVICE_ID = call.argument("serviceId");
+            TERMINAL_ID = call.argument("terminalId");
+            TRACK_ID = call.argument("trackId");
             Intent intent = new Intent(context,XAmapTrackService.class);
             context.bindService(intent,conn,Context.BIND_AUTO_CREATE);
         } if (call.method.equals("unbind")) {
+            SERVICE_ID = null;
+            TERMINAL_ID = null;
+            TRACK_ID = null;
             context.unbindService(conn);
         } if (call.method.equals("startAlarm")) {
             startAlarm();
@@ -137,8 +203,6 @@ public class XAmapTrackPlugin implements FlutterPlugin, MethodCallHandler,Activi
             xAmapTrackService.stopTrack();
         } if (call.method.equals("queryLatestPoint")) {
             xAmapTrackService.queryLatestPoint();
-        } if (call.method.equals("watchLatestPoint")) {
-            result.success(asyncGetLatestPoint());
         } if (call.method.equals("queryTerminalTrack")) {
             xAmapTrackService.queryTerminalTrack();
         } if (call.method.equals("queryHistoryTrack")) {
@@ -170,13 +234,6 @@ public class XAmapTrackPlugin implements FlutterPlugin, MethodCallHandler,Activi
             Log.d(TAG, "Alarm is not Canceled: " + e.toString());
         }
         context.unregisterReceiver(m_testReceiver);
-    }
-
-    public Future<Point> asyncGetLatestPoint() {
-        threadPool = (ThreadPoolExecutor) Executors.newCachedThreadPool();
-        XAmapTrackPointCall xAmapTrackPointCall = new XAmapTrackPointCall(xAmapTrackService);
-        Future<Point> future = threadPool.submit(xAmapTrackPointCall);
-        return future;
     }
 
 }

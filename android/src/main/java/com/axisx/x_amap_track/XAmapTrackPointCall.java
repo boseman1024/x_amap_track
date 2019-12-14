@@ -5,8 +5,10 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 import com.amap.api.track.query.entity.Point;
+import org.json.JSONObject;
 
-public class XAmapTrackPointCall implements Callable<Point>{
+@Deprecated
+public class XAmapTrackPointCall implements Callable<String>{
     private final String TAG = "XAmapTrackPointCall";
     private boolean flag = true;
     private Point point;
@@ -27,21 +29,31 @@ public class XAmapTrackPointCall implements Callable<Point>{
         xAmapTrackService.setPointCallback(new XAmapTrackService.PointCallback(){
             @Override
             public void onPointChange(Point point){
+                Log.d(TAG,"点位发生改变");
                 Message msg = new Message();
                 msg.obj = point;
                 handler.sendMessage(msg);
             }
         });
+        Log.d(TAG,"PointCallback初始化");
         xAmapTrackService.queryLatestPoint();
     }
 
     @Override
-    public Point call() throws Exception {
+    public String call() throws Exception {
         Log.d(TAG,"点位回调开始");
         while(flag){
             Log.d(TAG,"等待点位返回");
         }
-        Log.d(TAG,"点位返回："+point.getTime());
-        return point;
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("time" , point.getTime());
+        jsonObject.put("lat" , point.getLat());
+        jsonObject.put("lng" , point.getLng());
+        jsonObject.put("props" , point.getProps());
+        jsonObject.put("direction" , point.getDirection());
+        jsonObject.put("accuracy" , point.getAccuracy());
+        jsonObject.put("height" , point.getHeight());
+        Log.d(TAG,"点位返回："+jsonObject.toString());
+        return jsonObject.toString();
     }
 }

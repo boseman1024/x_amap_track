@@ -11,7 +11,7 @@
         android:icon="@mipmap/ic_launcher">
         <meta-data
             android:name="com.amap.api.v2.apikey"
-            android:value="YOUR KEY"/>
+            android:value="5e6eb68a7a210d7e265093a2bafdb483"/>
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"

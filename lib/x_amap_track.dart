@@ -1,19 +1,15 @@
 import 'dart:async';
-
 import 'package:flutter/services.dart';
-import 'entity/Point.dart';
 
 class XAmapTrack {
-  static const MethodChannel _channel =
-  const MethodChannel('x_amap_track');
-  static StreamController<Point> sc;
+  static const MethodChannel _channel = const MethodChannel('x_amap_track');
   static Future<String> get platformVersion async {
     final String version = await _channel.invokeMethod('getPlatformVersion');
     return version;
   }
 
-  static Future<void> bind() async {
-    await _channel.invokeMethod('bind');
+  static Future<void> bind(num serviceId,num terminalId,num trackId) async {
+    await _channel.invokeMethod('bind',{'serviceId': '$serviceId','terminalId': '$terminalId','trackId': '$trackId'});
   }
   static Future<void> unbind() async {
     await _channel.invokeMethod('unbind');
@@ -41,20 +37,5 @@ class XAmapTrack {
   }
   static Future<void> stopRecord() async {
     await _channel.invokeMethod('stopRecord');
-  }
-  static Future<Stream> watchTrack() async{
-    Duration interval = Duration(seconds: 5);
-    Stream<int> stream = Stream.periodic(interval, (data) => data);
-    return stream;
-  }
-  //TODO
-  static Stream<Point> watchLatestPoint() async* {
-    sc = StreamController<Point>();
-    final point = await _channel.invokeMethod('watchLatestPoint');
-    sc.sink.add(point);
-    yield* sc.stream;
-  }
-  static Future<void> stopWatchLatestPoint() async {
-    await sc.close();
   }
 }

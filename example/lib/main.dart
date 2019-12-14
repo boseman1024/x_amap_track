@@ -13,12 +13,18 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
   String _platformVersion = 'Unknown';
-
+  static const EventChannel _eventChannel = EventChannel("x_amap_track_event_channel");
+  String _point = '';
   @override
   void initState() {
     super.initState();
     initPlatformState();
     WidgetsBinding.instance.addObserver(this);
+    _eventChannel.receiveBroadcastStream().listen((data){
+      setState(() {
+        _point = data;
+      });
+    });
   }
 
   @override
@@ -58,20 +64,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
-        ),
         body: Center(
             child: Column(
               children: <Widget>[
                 Text('Running on: $_platformVersion\n'),
+                Text('Running on: $_point\n'),
                 RaisedButton(
                   onPressed: () async{
                     await XAmapTrack.startAlarm();
                   },
                   child: const Text(
                       'startAlarm',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
                 RaisedButton(
@@ -80,16 +84,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
                   },
                   child: const Text(
                       'stopAlarm',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
                 RaisedButton(
                   onPressed: () async{
-                    await XAmapTrack.bind();
+                    await XAmapTrack.bind(93958,231732097,20);
                   },
                   child: const Text(
                       'bind',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
                 RaisedButton(
@@ -98,7 +102,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
                   },
                   child: const Text(
                       'unbind',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
                 RaisedButton(
@@ -107,7 +111,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
                   },
                   child: const Text(
                       'queryLatestPoint',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
                 RaisedButton(
@@ -116,7 +120,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
                   },
                   child: const Text(
                       'queryTerminalTrack',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
                 RaisedButton(
@@ -125,7 +129,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
                   },
                   child: const Text(
                       'queryHistoryTrack',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
                 RaisedButton(
@@ -134,7 +138,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
                   },
                   child: const Text(
                       'queryTerminal',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
                 RaisedButton(
@@ -143,7 +147,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
                   },
                   child: const Text(
                       'startRecord',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
                 RaisedButton(
@@ -152,7 +156,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver{
                   },
                   child: const Text(
                       'stopRecord',
-                      style: TextStyle(fontSize: 20)
+                      style: TextStyle(fontSize: 12)
                   ),
                 ),
               ],
