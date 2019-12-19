@@ -22,6 +22,8 @@ public class XAmapTrackService extends  Service{
     private final IBinder binder = new MyBinder();        //绑定器
     private Intent intent;
     private PointCallback pointCallback;
+    private HistoryPointCallback historyPointCallback;
+    private QueryTrackCallback queryTrackCallback;
     private AMapTrackClient aMapTrackClient;
     private boolean isServiceRunning;
     private boolean isGatherRunning;
@@ -49,10 +51,8 @@ public class XAmapTrackService extends  Service{
             if (latestPointResponse.isSuccess()) {
                 Point point = latestPointResponse.getLatestPoint().getPoint();
                 Log.d(TAG, "实时位置："+point.getTime());
-                if(pointCallback!=null){pointCallback.onPointChange(point);}
             } else {
                 Log.d(TAG, "查询实时位置失败");
-                if(pointCallback!=null){pointCallback.onPointChange(null);}
             }
         }
         @Override
@@ -69,7 +69,7 @@ public class XAmapTrackService extends  Service{
                 HistoryTrack historyTrack = historyTrackResponse.getHistoryTrack();
                 Log.d(TAG, historyTrack.getCount()+" ");
             } else {
-                Log.d(TAG, "查询历史轨迹");
+                Log.d(TAG, "查询历史轨迹失败");
             }
         }
         @Override
@@ -87,6 +87,10 @@ public class XAmapTrackService extends  Service{
                 List<Track> list = queryTrackResponse.getTracks();
                 for(int i=0;i<list.size();i++){
                     Log.d(TAG, "查询终端轨迹ID："+list.get(i).getTrid());
+                }
+                if(queryTrackCallback!=null&&queryTrackResponse.getCount()>0&&list.get(0).getCount()>0){
+                    queryTrackCallback.onQueryTrackChange(queryTrackResponse);
+                    Log.d(TAG, "发送终端轨迹：");
                 }
             } else {
                 Log.d(TAG, "查询终端轨迹失败");
@@ -130,7 +134,7 @@ public class XAmapTrackService extends  Service{
                 Log.d(TAG, "停止服务成功");
                 isServiceRunning = false;
                 isGatherRunning = false;
-                stopGather();
+                //stopGather();
             } else {
                 Log.d(TAG, "error onStopTrackCallback, status: " + status + ", msg: " + msg);
             }
@@ -150,6 +154,7 @@ public class XAmapTrackService extends  Service{
             if (status == ErrorCode.TrackListen.STOP_GATHER_SUCCE) {
                 Log.d(TAG,"定位采集停止成功");
                 isGatherRunning = false;
+                stopTrack();
             } else {
                 Log.d(TAG, "error onStopGatherCallback, status: " + status + ", msg: " + msg);
             }
@@ -165,9 +170,22 @@ public class XAmapTrackService extends  Service{
     public void setPointCallback(PointCallback pointCallback) {
         this.pointCallback = pointCallback;
     }
-
     public interface PointCallback {
         void onPointChange(Point point);
+    }
+    public void setHistoryPointCallback(HistoryPointCallback historyPointCallback) {
+        this.historyPointCallback = historyPointCallback;
+    }
+
+    public interface HistoryPointCallback {
+        void onHistoryPointChange(HistoryTrack historyTrack);
+    }
+    public void setQueryTrackCallback(QueryTrackCallback queryTrackCallback) {
+        this.queryTrackCallback = queryTrackCallback;
+    }
+
+    public interface QueryTrackCallback {
+        void onQueryTrackChange(QueryTrackResponse queryTrackResponse);
     }
 
     /** 绑定时执行 */
@@ -247,7 +265,8 @@ public class XAmapTrackService extends  Service{
     public void init(){
         if(aMapTrackClient==null){
             aMapTrackClient = new AMapTrackClient(this);
-            aMapTrackClient.setInterval(5, 30);
+            aMapTrackClient.setInterval(1, 5);
+            aMapTrackClient.setLocationMode(LocationMode.HIGHT_ACCURACY);
         }
     }
 
@@ -289,12 +308,12 @@ public class XAmapTrackService extends  Service{
         aMapTrackClient.queryLatestPoint(new LatestPointRequest(SERVICE_ID,TERMINAL_ID,TRACK_ID),onTrackListener);
     }
 
-    public void queryHistoryTrack(){
+    public void queryHistoryTrack(long startTime,long endTime){
         HistoryTrackRequest historyTrackRequest = new HistoryTrackRequest(
                 SERVICE_ID,
                 TERMINAL_ID,
-                System.currentTimeMillis() - 12 * 60 * 60 * 1000,
-                System.currentTimeMillis(),
+                startTime,
+                endTime,
                 0,      // 不绑路
                 0,      // 不做距离补偿
                 5000,   // 距离补偿阈值，只有超过5km的点才启用距离补偿
@@ -312,12 +331,13 @@ public class XAmapTrackService extends  Service{
         );
         aMapTrackClient.queryTerminal(queryTerminalRequest, onTrackListener);
     }
-    public void queryTerminalTrack(){
+    public void queryTerminalTrack(long startTime,long endTime){
         QueryTrackRequest queryTrackRequest = new QueryTrackRequest(
                 SERVICE_ID,
                 TERMINAL_ID,
-                System.currentTimeMillis() - 24 * 60 * 60 * 1000,
-                System.currentTimeMillis()
+                TRACK_ID,
+                startTime,
+                endTime
         );
         aMapTrackClient.queryTerminalTrack(queryTrackRequest, onTrackListener);
     }
